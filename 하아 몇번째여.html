@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>알고리즘 보물찾기</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0; padding: 20px; background: #f5f5f5;
+    }
+    h3 {
+      text-align: center;
+      line-height: 1.6;
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0;
+    }
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+      align-items: flex-start;
+    }
+    #gameArea {
+      text-align: center;
+      display: none;
+    }
+    table {
+      margin: 10px auto;
+      border-collapse: collapse;
+    }
+    td {
+      width: 40px; height: 40px;
+      border: 1px solid #ccc;
+      font-size: 24px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    td.visited {
+      background-color: #a3d5ff;
+    }
+    #leaderboardBox {
+      width: 240px;
+      text-align: center;
+    }
+    #podiumButton, #clearBtn, #restartBtn {
+      margin: 10px 0 5px 0;
+      padding: 8px 16px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #podiumButton {
+      background-color: gold;
+    }
+    #clearBtn {
+      background-color: crimson;
+      color: white;
+    }
+    #restartBtn {
+      background-color: #007bff;
+      color: white;
+      display: none;
+    }
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 14px;
+      color: gray;
+    }
+    #mobileControls {
+      margin-top: 20px;
+      display: none;
+    }
+    #mobileControls button {
+      font-size: 28px;
+      padding: 10px 18px;
+      margin: 5px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background-color: #eee;
+      user-select: none;
+    }
+    #mobileControls .row {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h3>
+    2025년 여름방학 교육기부 쏙쏙캠프<br />
+    장항중앙초등학교 × ESC 4팀
+  </h3>
+  <h1>🚢 알고리즘 보물찾기 🪙</h1>
+
+  <div id="startScreen" style="text-align:center;">
+    이름: <input type="text" id="playerName" placeholder="이름 입력" />
+    <button onclick="startGame(false)">게임 시작</button>
+    <button onclick="startGame(true)">모바일 시작</button>
+  </div>
+
+  <div class="container">
+    <div id="gameArea">
+      <p>남은 이동 수: <span id="movesLeft">15</span></p>
+      <table id="board"></table>
+      <p>찾은 보물: <span id="score">0</span> / 20</p>
+
+      <div id="mobileControls">
+        <div class="row">
+          <button onclick="move('up')" aria-label="위쪽 이동">⬆️</button>
+        </div>
+        <div class="row">
+          <button onclick="move('left')" aria-label="왼쪽 이동">⬅️</button>
+          <button onclick="move('down')" aria-label="아래쪽 이동">⬇️</button>
+          <button onclick="move('right')" aria-label="오른쪽 이동">➡️</button>
+        </div>
+      </div>
+
+      <button id="restartBtn" onclick="restartGame()">🔄 다시 시작</button>
+    </div>
+
+    <div id="leaderboardBox">
+      <button id="podiumButton" onclick="showPodium()">🏅 포디움</button>
+      <h2>🏆 순위표</h2>
+      <ol id="leaderboard"></ol>
+      <button id="clearBtn" onclick="clearLeaderboard()">🗑️ 순위표 초기화</button>
+    </div>
+  </div>
+
+  <footer>
+    개발자 : 황경주
+  </footer>
+
+  <script>
+    const SIZE = 7;
+    const MAX_MOVES = 15;
+    let board = [];
+    let ship = { x: 3, y: 3 };
+    let moves = MAX_MOVES;
+    let score = 0;
+    let player = "";
+    let mobileMode = false;
+
+    function startGame(isMobile) {
+      player = document.getElementById("playerName").value.trim();
+      if (!player) {
+        alert("이름을 입력해주세요!");
+        return;
+      }
+      mobileMode = isMobile;
+
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("gameArea").style.display = "block";
+      document.getElementById("mobileControls").style.display = mobileMode ? "block" : "none";
+
+      initBoard();
+      renderBoard();
+      updateUI();
+
+      document.getElementById("restartBtn").style.display = "none";
+    }
+
+    function initBoard() {
+      board = Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => ""));
+      let treasures = 0;
+      while (treasures < 20) {
+        let x = Math.floor(Math.random() * SIZE);
+        let y = Math.floor(Math.random() * SIZE);
+        if ((x === 3 && y === 3) || board[y][x] === "🪙") continue;
+        board[y][x] = "🪙";
+        treasures++;
+      }
+      ship = { x: 3, y: 3 };
+      moves = MAX_MOVES;
+      score = 0;
+    }
+
+    function move(dir) {
+      if (moves <= 0) return;
+
+      const dx = { left: -1, right: 1, up: 0, down: 0 };
+      const dy = { left: 0, right: 0, up: -1, down: 1 };
+
+      let newX = ship.x + dx[dir];
+      let newY = ship.y + dy[dir];
+
+      if (
+        newX < 0 || newX >= SIZE ||
+        newY < 0 || newY >= SIZE ||
+        board[newY][newX] === "🌊"
+      ) return;
+
+      board[ship.y][ship.x] = "🌊";
+      ship.x = newX;
+      ship.y = newY;
+
+      if (board[ship.y][ship.x] === "🪙") {
+        score++;
+        board[ship.y][ship.x] = ""; // 보물 먹으면 없어짐
+      }
+
+      moves--;
+      renderBoard();
+      updateUI();
+
+      if (moves === 0) {
+        endGame();
+      }
+    }
+
+    function renderBoard() {
+      const table = document.getElementById("board");
+      table.innerHTML = "";
+      for (let y = 0; y < SIZE; y++) {
+        const row = document.createElement("tr");
+        for (let x = 0; x < SIZE; x++) {
+          const cell = document.createElement("td");
+          if (x === ship.x && y === ship.y) {
+            cell.textContent = "🚢";
+          } else if (board[y][x] === "🪙") {
+            cell.textContent = "🪙";
+          } else if (board[y][x] === "🌊") {
+            cell.textContent = "🌊";
+            cell.classList.add("visited");
+          } else {
+            cell.textContent = "";
+          }
+          row.appendChild(cell);
+        }
+        table.appendChild(row);
+      }
+    }
+
+    function updateUI() {
+      document.getElementById("movesLeft").textContent = moves;
+      document.getElementById("score").textContent = score;
+    }
+
+    function saveScore() {
+      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      scores.push({ name: player, score });
+      scores.sort((a, b) => b.score - a.score);
+      localStorage.setItem("scores", JSON.stringify(scores));
+      renderLeaderboard();
+    }
+
+    function renderLeaderboard() {
+      const list = document.getElementById("leaderboard");
+      list.innerHTML = "";
+      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      scores.forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = `${s.name} - ${s.score}개`;
+        list.appendChild(li);
+      });
+    }
+
+    function restartGame() {
+      document.getElementById("gameArea").style.display = "none";
+      document.getElementById("startScreen").style.display = "block";
+      document.getElementById("restartBtn").style.display = "none";
+      document.getElementById("mobileControls").style.display = "none";
+    }
+
+    function showPodium() {
+      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      let podium = scores.slice(0, 3);
+      let message = "🏅 Top 3 포디움 🏅\n\n";
+      if (podium.length === 0) {
+        message += "기록이 없습니다.";
+      } else {
+        podium.forEach((s, i) => {
+          message += `${i + 1}등: ${s.name} - ${s.score}개\n`;
+        });
+      }
+      alert(message);
+    }
+
+    function clearLeaderboard() {
+      const pw = prompt("관리자 비밀번호를 입력하세요.");
+      if (pw === "0926") {
+        if (confirm("정말 순위표를 초기화할까요? 되돌릴 수 없습니다.")) {
+          localStorage.removeItem("scores");
+          renderLeaderboard();
+        }
+      } else {
+        alert("비밀번호가 틀렸습니다.");
+      }
+    }
+
+    function endGame() {
+      alert(`게임 종료! 보물 ${score}개를 찾았습니다.`);
+      saveScore();
+      document.getElementById("restartBtn").style.display = "inline-block";
+
+      if (mobileMode) {
+        // 모바일은 강제로 초기화면으로 돌아가기
+        document.getElementById("gameArea").style.display = "none";
+        document.getElementById("startScreen").style.display = "block";
+        document.getElementById("mobileControls").style.display = "none";
+      }
+    }
+
+    // 키보드 방향키 이벤트 (모바일 모드 제외)
+    window.addEventListener("keydown", function(e) {
+      if (mobileMode) return;
+      if (e.key === "ArrowUp") move("up");
+      else if (e.key === "ArrowDown") move("down");
+      else if (e.key === "ArrowLeft") move("left");
+      else if (e.key === "ArrowRight") move("right");
+    });
+
+    renderLeaderboard();
+  </script>
+</body>
+</html>
